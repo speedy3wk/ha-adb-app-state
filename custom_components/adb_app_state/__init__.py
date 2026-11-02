@@ -10,6 +10,17 @@ from homeassistant.helpers import device_registry as dr
 from .apps import disney_plus, prime_video
 from .const import DOMAIN, PLATFORMS
 from .coordinator import AdbAppStateCoordinator
+from .validation import (
+    DELAY_MS,
+    PROFILE_INDEX,
+    REPEAT_COUNT,
+    TIMEOUT,
+    disney_video,
+    pin,
+)
+from .validation import (
+    prime_video as validate_prime_video,
+)
 
 SERVICE_PREPARE_DISNEY_MOVIE = "prepare_disney_movie"
 SERVICE_PREPARE_PRIME_MOVIE = "prepare_prime_movie"
@@ -18,11 +29,11 @@ SERVICE_MEDIA_DISPATCH = "media_dispatch"
 SERVICE_SCHEMA_PREPARE_DISNEY = vol.Schema(
     {
         vol.Optional("entry_id"): str,
-        vol.Required("film_id"): str,
-        vol.Optional("profile_index"): vol.Coerce(int),
-        vol.Optional("pin"): str,
+        vol.Required("film_id"): disney_video,
+        vol.Optional("profile_index"): PROFILE_INDEX,
+        vol.Optional("pin"): pin,
         vol.Optional("pause_on_start", default=False): bool,
-        vol.Optional("timeout", default=90): vol.Coerce(int),
+        vol.Optional("timeout", default=90): TIMEOUT,
     }
 )
 
@@ -30,10 +41,10 @@ SERVICE_SCHEMA_PREPARE_DISNEY = vol.Schema(
 SERVICE_SCHEMA_PREPARE_PRIME = vol.Schema(
     {
         vol.Optional("entry_id"): str,
-        vol.Required("film_asin"): str,
+        vol.Required("film_asin"): validate_prime_video,
         vol.Optional("auto_login", default=True): bool,
         vol.Optional("pause_on_start", default=False): bool,
-        vol.Optional("timeout", default=90): vol.Coerce(int),
+        vol.Optional("timeout", default=90): TIMEOUT,
     }
 )
 
@@ -42,8 +53,8 @@ SERVICE_SCHEMA_MEDIA_DISPATCH = vol.Schema(
     {
         vol.Optional("entry_id"): str,
         vol.Required("key"): str,
-        vol.Optional("times", default=1): vol.Coerce(int),
-        vol.Optional("delay_ms", default=250): vol.Coerce(int),
+        vol.Optional("times", default=1): REPEAT_COUNT,
+        vol.Optional("delay_ms", default=250): DELAY_MS,
     }
 )
 
@@ -81,14 +92,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             data = call.data
             coord = _select_coordinator(data.get("entry_id"))
 
-            await disney_plus.prepare_movie(
-                coordinator=coord,
-                film_id=str(data["film_id"]),
-                profile_index=data.get("profile_index"),
-                pin=data.get("pin"),
-                pause_on_start=bool(data.get("pause_on_start", False)),
-                timeout_s=int(data.get("timeout", 90)),
-            )
+            async with coord.action_lock:
+                await disney_plus.prepare_movie(
+                    coordinator=coord,
+                    film_id=data["film_id"],
+                    profile_index=data.get("profile_index"),
+                    pin=data.get("pin"),
+                    pause_on_start=data.get("pause_on_start", False),
+                    timeout_s=data.get("timeout", 90),
+                )
 
         hass.services.async_register(
             DOMAIN,
@@ -101,13 +113,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             data = call.data
             coord = _select_coordinator(data.get("entry_id"))
 
-            await prime_video.prepare_movie(
-                coordinator=coord,
-                film_asin=str(data["film_asin"]),
-                auto_login=bool(data.get("auto_login", True)),
-                pause_on_start=bool(data.get("pause_on_start", False)),
-                timeout_s=int(data.get("timeout", 90)),
-            )
+            async with coord.action_lock:
+                await prime_video.prepare_movie(
+                    coordinator=coord,
+                    film_asin=data["film_asin"],
+                    auto_login=data.get("auto_login", True),
+                    pause_on_start=data.get("pause_on_start", False),
+                    timeout_s=data.get("timeout", 90),
+                )
 
         hass.services.async_register(
             DOMAIN,
@@ -147,15 +160,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     f"Unsupported key: {key}. Note: fast-forward/rewind are intentionally disabled because they can destroy the Disney media session on this device."
                 )
 
-            times = max(1, min(200, int(data.get("times", 1))))
-            delay_s = max(0.0, float(int(data.get("delay_ms", 250))) / 1000.0)
+            times = data.get("times", 1)
+            delay_s = data.get("delay_ms", 250) / 1000.0
 
-            for i in range(times):
-                await coord.async_shell(
-                    f"cmd media_session dispatch {key}", timeout_s=6.0
-                )
-                if delay_s and i != times - 1:
-                    await asyncio.sleep(delay_s)
+            async with coord.action_lock:
+                for i in range(times):
+                    await coord.async_shell(
+                        f"cmd media_session dispatch {key}", timeout_s=6.0
+                    )
+                    if delay_s and i != times - 1:
+                        await asyncio.sleep(delay_s)
 
         hass.services.async_register(
             DOMAIN,

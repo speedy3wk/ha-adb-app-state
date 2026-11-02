@@ -78,3 +78,38 @@ async def test_options_form_and_save(hass, entry):
     result = await flow.async_step_init(options)
     assert result["type"] == "create_entry"
     assert result["data"] == options
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("host", ""),
+        ("host", "bad host"),
+        ("port", 0),
+        ("port", 65536),
+        ("port", 1.5),
+        ("port", True),
+        ("name", " "),
+    ],
+)
+async def test_invalid_configuration_does_not_attempt_connection(hass, field, value):
+    flow = AdbAppStateConfigFlow()
+    flow.hass = hass
+    flow.context = {"source": "user"}
+    data = {"name": "TV", "host": "127.0.0.2", "port": 5555, field: value}
+    with patch(
+        "custom_components.adb_app_state.config_flow._async_test_connection"
+    ) as connect:
+        result = await flow.async_step_user(data)
+    assert result["type"] == "form"
+    assert result["errors"] == {field: "invalid_input"}
+    connect.assert_not_awaited()
+
+
+@pytest.mark.parametrize("value", [0, -1, 1.5, True, "bad"])
+async def test_invalid_polling_interval_is_not_saved(hass, entry, value):
+    flow = AdbAppStateOptionsFlowHandler(entry)
+    flow.hass = hass
+    result = await flow.async_step_init({"scan_interval": value})
+    assert result["type"] == "form"
+    assert result["errors"] == {"scan_interval": "invalid_input"}

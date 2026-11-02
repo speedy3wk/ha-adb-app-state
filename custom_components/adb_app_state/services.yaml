@@ -1,6 +1,6 @@
 prepare_disney_movie:
   name: Prepare Disney+ movie
-  description: Opens a Disney+ video by film_id, optionally selects profile + enters PIN, optionally pauses on start.
+  description: Restarts Disney+ (interrupting current playback), opens a video, optionally selects a profile and enters a PIN, and optionally pauses after stable playback detection.
   fields:
     entry_id:
       name: Config entry id
@@ -11,7 +11,7 @@ prepare_disney_movie:
         text:
     film_id:
       name: Film ID
-      description: Disney+ video UUID (used as https://www.disneyplus.com/de-de/play/<film_id>) OR a full Disney+ URL. Must be playable on this device/account; otherwise Disney may show an error dialog and the service will abort.
+      description: Disney+ video UUID (used as https://www.disneyplus.com/de-de/play/<film_id>) or a full HTTPS Disney+ URL. Must be playable on this device/account; otherwise Disney may show an error dialog and the service will abort.
       example: ab7c4e29-04f1-46dd-931a-d43be1ce0f8c
       required: true
       selector:
@@ -28,21 +28,21 @@ prepare_disney_movie:
           mode: box
     pin:
       name: PIN
-      description: Digits only.
+      description: Non-empty string of ASCII digits (0-9). Required if the selected profile asks for a PIN.
       example: "1234"
       required: false
       selector:
         text:
     pause_on_start:
       name: Pause on start
-      description: Presses play/pause when playback is detected.
+      description: Sends pause after stable playback detection in the restarted app.
       example: true
       required: false
       selector:
         boolean:
     timeout:
       name: Timeout (seconds)
-      description: Overall timeout for the automation.
+      description: Loop deadline in seconds (10-600), after waiting for earlier actions. In-flight ADB commands may finish later.
       example: 90
       required: false
       selector:
@@ -53,7 +53,7 @@ prepare_disney_movie:
 
 prepare_prime_movie:
   name: Prepare Prime Video movie
-  description: Opens a Prime Video title by ASIN or URL, optionally auto-presses DPAD_CENTER, optionally pauses on start.
+  description: Restarts Prime Video (interrupting current playback), opens a title by ASIN or HTTPS URL, optionally presses DPAD_CENTER, and optionally pauses after stable playback detection.
   fields:
     entry_id:
       name: Config entry id
@@ -64,7 +64,7 @@ prepare_prime_movie:
         text:
     film_asin:
       name: Amazon ASIN
-      description: Die ID des Films (z.B. B0B5NPCSZX). Es wird https://watch.amazon.de/watch?asin=<ASIN> verwendet.
+      description: 10-character alphanumeric ASIN (for example B0B5NPCSZX), or an HTTPS Prime Video or supported Amazon regional URL. ASINs use https://watch.amazon.de/watch?asin=<ASIN>.
       example: B0B5NPCSZX
       required: true
       selector:
@@ -78,14 +78,14 @@ prepare_prime_movie:
         boolean:
     pause_on_start:
       name: Pause on start
-      description: Sends pause when MOVIE is detected.
+      description: Sends pause after stable playback detection in the restarted app.
       example: true
       required: false
       selector:
         boolean:
     timeout:
       name: Timeout (seconds)
-      description: Overall timeout for the automation.
+      description: Loop deadline in seconds (10-600), after waiting for earlier actions. In-flight ADB commands may finish later.
       example: 90
       required: false
       selector:

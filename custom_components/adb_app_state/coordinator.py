@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import logging
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+from threading import Lock
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -29,6 +33,8 @@ from .const import (
     UI_STATE_NOT_SUPPORTED,
     UI_STATE_OFF,
 )
+from .validation import PORT, SCAN_INTERVAL
+from .validation import host as validate_host
 from .view_dump import (
     parse_primary_package_from_window_views_zip,
     parse_visible_components_from_window_views_zip,
@@ -74,7 +80,9 @@ class AdbAppStateCoordinator(DataUpdateCoordinator[AppStateData]):
         self.entry = entry
         options = entry.options
 
-        scan_interval_s = int(options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+        scan_interval_s = SCAN_INTERVAL(
+            options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+        )
         super().__init__(
             hass,
             _LOGGER,
@@ -82,8 +90,8 @@ class AdbAppStateCoordinator(DataUpdateCoordinator[AppStateData]):
             update_interval=timedelta(seconds=scan_interval_s),
         )
 
-        host = entry.data["host"]
-        port = int(entry.data.get("port", DEFAULT_PORT))
+        host = validate_host(entry.data["host"])
+        port = PORT(entry.data.get("port", DEFAULT_PORT))
         adbkey_path = options.get(CONF_ADBKEY_PATH) or None
         reuse_androidtv_key = bool(
             options.get(CONF_REUSE_ANDROIDTV_KEY, DEFAULT_REUSE_ANDROIDTV_KEY)
@@ -96,6 +104,18 @@ class AdbAppStateCoordinator(DataUpdateCoordinator[AppStateData]):
             adbkey_path=adbkey_path,
             reuse_androidtv_key=reuse_androidtv_key,
         )
+        self._adb_lock = Lock()
+        self.action_lock = asyncio.Lock()
+
+    @contextmanager
+    def _connection(self) -> Iterator[None]:
+        # Keep ownership in the worker even if its awaiting coroutine is cancelled.
+        with self._adb_lock:
+            try:
+                self._client.connect()
+                yield
+            finally:
+                self._client.close()
 
     async def _async_update_data(self) -> AppStateData:
         try:
@@ -113,18 +133,14 @@ class AdbAppStateCoordinator(DataUpdateCoordinator[AppStateData]):
 
     async def async_shell(self, command: str, *, timeout_s: float = 8.0) -> str:
         def _sync() -> str:
-            self._client.connect()
-            try:
+            with self._connection():
                 return self._client.shell(command, timeout_s=timeout_s)
-            finally:
-                self._client.close()
 
         return await self.hass.async_add_executor_job(_sync)
 
     def _poll_sync(self) -> AppStateData:
         debug: dict[str, Any] = {}
-        self._client.connect()
-        try:
+        with self._connection():
             # Determine foreground app (lightweight), then only use dumps for supported apps.
             activity_dump = self._client.shell(
                 "dumpsys activity activities", timeout_s=6.0
@@ -258,6 +274,3 @@ class AdbAppStateCoordinator(DataUpdateCoordinator[AppStateData]):
                 input_required=False,
                 debug={**debug, "reason": "no_foreground_app"},
             )
-
-        finally:
-            self._client.close()

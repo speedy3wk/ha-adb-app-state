@@ -7,6 +7,7 @@ import pytest
 from homeassistant.helpers.update_coordinator import UpdateFailed
 
 from custom_components.adb_app_state.adb_client import ADBAuthError, ADBConnectionError
+from custom_components.adb_app_state.apps.playback import async_refresh_state
 from custom_components.adb_app_state.binary_sensor import InputRequiredBinarySensor
 from custom_components.adb_app_state.const import (
     UI_STATE_CHOOSE_PROFILE,
@@ -97,6 +98,35 @@ async def test_shell_closes_on_failure(coordinator):
         with pytest.raises(ADBConnectionError, match="timeout"):
             await coordinator.async_shell("echo ok")
     client.close.assert_called_once()
+
+
+@pytest.mark.parametrize("operation", ["shell", "poll"])
+async def test_failed_connect_is_closed_and_lock_is_released(coordinator, operation):
+    client = Mock()
+    client.connect.side_effect = ADBConnectionError("offline")
+    with patch.object(coordinator, "_client", client):
+        if operation == "shell":
+            with pytest.raises(ADBConnectionError, match="offline"):
+                await coordinator.async_shell("echo ok")
+        else:
+            assert (await coordinator._async_update_data()).ui_state == UI_STATE_OFF
+        client.close.assert_called_once()
+        client.connect.side_effect = None
+        client.shell.return_value = "ok"
+        assert await coordinator.async_shell("echo ok") == "ok"
+    assert client.close.call_count == 2
+
+
+async def test_failed_real_refresh_does_not_reuse_previous_movie(coordinator):
+    coordinator.async_set_updated_data(
+        AppStateData(UI_STATE_MOVIE, False, {"foreground_app": "com.disney.disneyplus"})
+    )
+    with patch.object(
+        coordinator, "_poll_sync", side_effect=ADBAuthError("authorization lost")
+    ):
+        with pytest.raises(RuntimeError, match="Unable to refresh"):
+            await async_refresh_state(coordinator)
+    assert coordinator.last_update_success is False
 
 
 async def test_entities_follow_coordinator(coordinator, entry):

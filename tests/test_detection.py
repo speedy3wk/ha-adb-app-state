@@ -118,16 +118,20 @@ def test_dispatch_fallback(package, state):
 
 @pytest.mark.parametrize("module", [disney_plus, prime_video])
 def test_video_url_preserves_full_url(module):
-    url = "https://example.test/video"
+    url = (
+        "https://www.disneyplus.com/de-de/play/ab7c4e29-04f1-46dd-931a-d43be1ce0f8c"
+        if module is disney_plus
+        else "https://watch.amazon.de/watch?asin=B0B5NPCSZX"
+    )
     assert module.build_video_url(f" {url} ") == url
 
 
 def test_video_ids():
-    assert disney_plus.build_video_url(" video-id ") == (
-        "https://www.disneyplus.com/de-de/play/video-id"
+    assert disney_plus.build_video_url(" ab7c4e29-04f1-46dd-931a-d43be1ce0f8c ") == (
+        "https://www.disneyplus.com/de-de/play/ab7c4e29-04f1-46dd-931a-d43be1ce0f8c"
     )
-    assert prime_video.build_video_url(" ASIN ") == (
-        "https://watch.amazon.de/watch?asin=ASIN"
+    assert prime_video.build_video_url(" b0b5npcsZX ") == (
+        "https://watch.amazon.de/watch?asin=B0B5NPCSZX"
     )
 
 

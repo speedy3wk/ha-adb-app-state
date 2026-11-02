@@ -51,11 +51,13 @@ Copy [`custom_components/adb_app_state`](./custom_components/adb_app_state) into
 
 Enter a device name, host/IP address and ADB port (default `5555`). Accept the authorization prompt on the TV during setup.
 
+Hosts must be IP addresses or valid hostnames; ports must be whole numbers from 1 to 65535.
+
 Under **Configure**, you can change:
 
 | Option | Default | Description |
 |---|---|---|
-| Polling interval | 5 seconds | Time between status updates. A poll can take longer if the device is slow. Use a positive value. |
+| Polling interval | 5 seconds | Positive whole number of seconds between status updates, minimum 1. A poll can take longer if the device is slow. |
 | Reuse AndroidTV key | Enabled | Reuse `.storage/androidtv_adbkey` and its `.pub` file when available. |
 | ADB private key path | Empty | Optional key path relative to the HA configuration directory; the matching `.pub` file must exist. |
 
@@ -86,7 +88,9 @@ These are **screen states**, not an exact playing/paused media status. No media 
 
 ## Actions
 
-All actions accept an optional `entry_id`. It is required when multiple devices are configured. This is the integration's config entry ID, not an entity ID.
+All actions accept an optional `entry_id`. It is required when multiple devices are configured. This is the integration's config entry ID, not an entity ID. Actions for the same device are serialized; subsequent actions wait for the active one. Polling continues, but each ADB connection is used exclusively by one operation at a time.
+
+**Changed in v0.1.1:** preparation always force-stops the target streaming app before opening the deep link. This interrupts any movie already running in that app. Android must confirm the stop, a fresh poll must show the target app is no longer foreground, and the deep-link launch must report `Status: ok` for that app. Success then requires two fresh target-app `MOVIE` observations at least 0.7 seconds apart.
 
 ### Prepare a Disney+ movie
 
@@ -99,11 +103,11 @@ data:
   timeout: 90
 ```
 
-- `film_id` is a playable Disney+ video UUID or full Disney+ URL. UUIDs use `https://www.disneyplus.com/de-de/play/<film_id>`.
-- `profile_index` is optional and zero-based; it moves right from the currently focused profile, not from a verified absolute position.
-- Optional `pin` sends digits to a detected PIN screen. Avoid storing real PINs in public examples or shared traces.
-- `pause_on_start` defaults to `false`; `timeout` defaults to 90 seconds.
-- The action can retry deep links, restart the app's task and press the focused play button. A detected Disney+ error dialog is dismissed and reported as an error.
+- `film_id` is a playable Disney+ video UUID or full HTTPS URL on `disneyplus.com` or one of its subdomains. UUIDs use `https://www.disneyplus.com/de-de/play/<film_id>`.
+- `profile_index` is optional, zero-based and limited to 0-10; it moves right from the currently focused profile, not from a verified absolute position.
+- Optional `pin` must be a non-empty string containing only ASCII digits (`0`-`9`); leading zeroes are preserved. A PIN prompt without a supplied PIN reports an error instead of repeatedly submitting an empty PIN. Avoid storing real PINs in public examples or shared traces.
+- `pause_on_start` defaults to `false`; `timeout` accepts whole seconds from 10-600 and defaults to 90.
+- After the initial app restart, the action can retry deep links and press the focused play button. A detected Disney+ error dialog is dismissed and reported as an error.
 
 ### Prepare a Prime Video movie
 
@@ -116,9 +120,9 @@ data:
   timeout: 90
 ```
 
-`film_asin` also accepts a full URL; ASINs use `https://watch.amazon.de/watch?asin=<ASIN>`. `auto_login` defaults to `true` and sends **one** DPAD-center press on an `IN_APP` screen. It does not enter account credentials or verify the focused control. `pause_on_start` defaults to `false`.
+`film_asin` must be a 10-character alphanumeric ASIN or a full HTTPS URL on `primevideo.com` or a supported Amazon regional domain (including `amazon.de`, `amazon.com` and `amazon.co.uk`, with their subdomains). ASINs use `https://watch.amazon.de/watch?asin=<ASIN>`. URLs with credentials, nonstandard ports or whitespace are rejected; the URL is passed as one quoted shell argument. `auto_login` defaults to `true` and sends **one** DPAD-center press on an `IN_APP` screen. It does not enter account credentials or verify the focused control. `pause_on_start` defaults to `false`; `timeout` accepts whole seconds from 10-600.
 
-Both preparation actions are best-effort navigation, not a guarantee that the requested title started. Existing subscriptions, availability, app focus, age restrictions and UI changes affect the result. The timeout is a loop deadline, not a strict upper bound on the runtime of an in-flight ADB command. Avoid running preparation actions concurrently for the same device.
+Both preparation actions remain best-effort navigation, not a guarantee of the exact requested title: the apps do not expose a reliable title ID in the screen data. The fresh stop/start checks prevent an unchanged old playback screen from being accepted as success; subscriptions, availability, focus, age restrictions and app behavior can still affect which title opens. A failed state refresh aborts rather than using stale data. The timeout starts after waiting for any earlier action and is a loop deadline, not a strict upper bound on in-flight ADB commands.
 
 ### Dispatch a media key
 
@@ -130,7 +134,7 @@ data:
   delay_ms: 250
 ```
 
-Supported keys: `play`, `pause`, `play-pause`, `stop`, `next`, `previous`, `headsethook`, `mute`. Commands go to Android's active media session, not a selected app. Repeats are clamped to 1-200; the default delay is 250 ms.
+Supported keys: `play`, `pause`, `play-pause`, `stop`, `next`, `previous`, `headsethook`, `mute`. Commands go to Android's active media session, not a selected app. Repeats must be whole numbers from 1-200, and the delay must be whole milliseconds from 0-2000 (default 250). Invalid inputs now raise validation errors instead of being silently clamped or truncated.
 
 **Fast-forward and rewind are intentionally disabled** because they can disrupt the Disney+ media session on the original target device.
 

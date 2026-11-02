@@ -3,9 +3,19 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..const import UI_STATE_IN_APP, UI_STATE_MOVIE, UI_STATE_PREVIEW
+from ..validation import TIMEOUT, prime_video
+from .playback import (
+    async_movie_is_stable,
+    async_open_video,
+    async_refresh_state,
+    async_stop_app,
+)
+
+if TYPE_CHECKING:
+    from ..coordinator import AdbAppStateCoordinator
 
 PACKAGE = "com.amazon.amazonvideo.livingroom"
 MAIN_ACTIVITY = "com.amazon.ignition.IgnitionActivity"
@@ -133,15 +143,15 @@ def detect_ui_state(
 
 
 def build_video_url(film_asin: str) -> str:
-    value = (film_asin or "").strip()
-    if value.startswith("http://") or value.startswith("https://"):
+    value = prime_video(film_asin)
+    if value.startswith("https://"):
         return value
     return f"https://watch.amazon.de/watch?asin={value}"
 
 
 async def prepare_movie(
     *,
-    coordinator: Any,
+    coordinator: AdbAppStateCoordinator,
     film_asin: str,
     auto_login: bool,
     pause_on_start: bool,
@@ -150,17 +160,10 @@ async def prepare_movie(
     """Best-effort Prime automation: open video, optional auto-login, optional pause on movie."""
 
     url = build_video_url(film_asin)
-    component = f"{PACKAGE}/{MAIN_ACTIVITY}"
-
-    async def open_video() -> None:
-        await coordinator.async_shell(
-            f"am start -W -a android.intent.action.VIEW -d '{url}' -n {component} -f 0x10008000",
-            timeout_s=12.0,
-        )
+    timeout_s = TIMEOUT(timeout_s)
 
     async def refresh_state() -> str:
-        await coordinator.async_request_refresh()
-        return coordinator.data.ui_state if coordinator.data else ""
+        return (await async_refresh_state(coordinator)).ui_state
 
     async def key(code: str) -> None:
         await coordinator.async_shell(f"input keyevent {code}", timeout_s=5.0)
@@ -170,10 +173,13 @@ async def prepare_movie(
             f"cmd media_session dispatch {cmd}", timeout_s=5.0
         )
 
-    deadline = time.monotonic() + max(20, int(timeout_s))
+    deadline = time.monotonic() + timeout_s
     sent_login = False
 
-    await open_video()
+    await async_stop_app(coordinator, PACKAGE)
+    await async_open_video(
+        coordinator, url=url, package=PACKAGE, activity=MAIN_ACTIVITY, clear_task=True
+    )
 
     while time.monotonic() < deadline:
         state = await refresh_state()
@@ -184,6 +190,10 @@ async def prepare_movie(
             continue
 
         if state == UI_STATE_MOVIE:
+            if not await async_movie_is_stable(coordinator, PACKAGE):
+                continue
+            if time.monotonic() >= deadline:
+                break
             if pause_on_start:
                 await media("pause")
             return

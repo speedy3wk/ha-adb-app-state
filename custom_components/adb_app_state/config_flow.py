@@ -9,6 +9,8 @@ from homeassistant.core import HomeAssistant, callback
 
 from .adb_client import AdbAppStateClient, ADBAuthError, ADBConnectionError
 from .const import CONF_HOST, CONF_NAME, CONF_PORT, DEFAULT_PORT, DOMAIN
+from .validation import PORT, SCAN_INTERVAL
+from .validation import host as validate_host
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,11 +25,27 @@ class AdbAppStateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_NAME, default="shield"): vol.All(
+                    str, str.strip, vol.Length(min=1)
+                ),
+                vol.Required(CONF_HOST): validate_host,
+                vol.Required(CONF_PORT, default=DEFAULT_PORT): PORT,
+            }
+        )
 
         if user_input is not None:
-            name = user_input[CONF_NAME]
-            host = user_input[CONF_HOST]
-            port = user_input[CONF_PORT]
+            try:
+                data: dict[str, Any] = schema(user_input)
+            except vol.Invalid as exc:
+                field = str(exc.path[0]) if exc.path else "base"
+                return self.async_show_form(
+                    step_id="user", data_schema=schema, errors={field: "invalid_input"}
+                )
+            name = data[CONF_NAME]
+            host = data[CONF_HOST]
+            port = data[CONF_PORT]
 
             await self.async_set_unique_id(f"{host}:{port}")
             self._abort_if_unique_id_configured()
@@ -42,15 +60,7 @@ class AdbAppStateConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 _LOGGER.exception("Unexpected error during config flow")
                 errors["base"] = "unknown"
             else:
-                return self.async_create_entry(title=name, data=user_input)
-
-        schema = vol.Schema(
-            {
-                vol.Required(CONF_NAME, default="shield"): str,
-                vol.Required(CONF_HOST): str,
-                vol.Required(CONF_PORT, default=DEFAULT_PORT): int,
-            }
-        )
+                return self.async_create_entry(title=name, data=data)
 
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
@@ -74,7 +84,7 @@ class AdbAppStateOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
                     default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
-                ): vol.Coerce(int),
+                ): SCAN_INTERVAL,
                 vol.Optional(
                     CONF_REUSE_ANDROIDTV_KEY,
                     default=options.get(
@@ -89,7 +99,14 @@ class AdbAppStateOptionsFlowHandler(config_entries.OptionsFlow):
         )
 
         if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
+            try:
+                data: dict[str, Any] = schema(user_input)
+            except vol.Invalid as exc:
+                field = str(exc.path[0]) if exc.path else "base"
+                return self.async_show_form(
+                    step_id="init", data_schema=schema, errors={field: "invalid_input"}
+                )
+            return self.async_create_entry(title="", data=data)
 
         return self.async_show_form(step_id="init", data_schema=schema)
 

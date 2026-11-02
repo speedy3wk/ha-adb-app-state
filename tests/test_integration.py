@@ -1,5 +1,6 @@
 """Run real platform setup, action dispatch and unloading with mocked ADB."""
 
+import asyncio
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -83,8 +84,12 @@ async def test_media_dispatch_rejects_seek(hass, services):
 @pytest.mark.parametrize(
     ("service", "module", "data"),
     [
-        ("prepare_disney_movie", "disney_plus", {"film_id": "test-video"}),
-        ("prepare_prime_movie", "prime_video", {"film_asin": "TESTASIN"}),
+        (
+            "prepare_disney_movie",
+            "disney_plus",
+            {"film_id": "ab7c4e29-04f1-46dd-931a-d43be1ce0f8c"},
+        ),
+        ("prepare_prime_movie", "prime_video", {"film_asin": "B0B5NPCSZX"}),
     ],
 )
 async def test_prepare_actions_forward_options(hass, services, service, module, data):
@@ -97,3 +102,76 @@ async def test_prepare_actions_forward_options(hass, services, service, module, 
     assert prepare.await_args.kwargs["timeout_s"] == 90
     for key, value in data.items():
         assert prepare.await_args.kwargs[key] == value
+
+
+async def test_actions_are_serialized_but_polling_can_continue(hass, services):
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    async def prepare(**kwargs):
+        entered.set()
+        await release.wait()
+
+    with (
+        patch(
+            "custom_components.adb_app_state.apps.prime_video.prepare_movie",
+            side_effect=prepare,
+        ),
+        patch.object(services, "async_shell") as shell,
+    ):
+        first = asyncio.create_task(
+            hass.services.async_call(
+                DOMAIN,
+                "prepare_prime_movie",
+                {"film_asin": "B0B5NPCSZX"},
+                blocking=True,
+            )
+        )
+        second = None
+        try:
+            await asyncio.wait_for(entered.wait(), 2)
+            assert services.action_lock.locked()
+            second = asyncio.create_task(
+                hass.services.async_call(
+                    DOMAIN, "media_dispatch", {"key": "pause"}, blocking=True
+                )
+            )
+            await asyncio.sleep(0)
+            shell.assert_not_awaited()
+            # The action lock is independent of the worker connection lock.
+            with patch.object(
+                services,
+                "_poll_sync",
+                return_value=AppStateData(UI_STATE_HOME, False, {}),
+            ):
+                assert (await services._async_update_data()).ui_state == UI_STATE_HOME
+            shell.assert_not_awaited()
+        finally:
+            release.set()
+            await first
+            if second is not None:
+                await second
+        shell.assert_awaited_once_with(
+            "cmd media_session dispatch pause", timeout_s=6.0
+        )
+        assert not services.action_lock.locked()
+
+
+async def test_action_error_releases_lock(hass, services):
+    with patch(
+        "custom_components.adb_app_state.apps.prime_video.prepare_movie",
+        side_effect=RuntimeError("launch failed"),
+    ):
+        with pytest.raises(RuntimeError, match="launch failed"):
+            await hass.services.async_call(
+                DOMAIN,
+                "prepare_prime_movie",
+                {"film_asin": "B0B5NPCSZX"},
+                blocking=True,
+            )
+    assert not services.action_lock.locked()
+    with patch.object(services, "async_shell") as shell:
+        await hass.services.async_call(
+            DOMAIN, "media_dispatch", {"key": "pause"}, blocking=True
+        )
+    shell.assert_awaited_once()

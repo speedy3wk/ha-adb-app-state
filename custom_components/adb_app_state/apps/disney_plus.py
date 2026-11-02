@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from ..const import (
     UI_STATE_CHOOSE_PROFILE,
@@ -12,7 +12,18 @@ from ..const import (
     UI_STATE_MOVIE,
     UI_STATE_MOVIE_DETAIL,
 )
+from ..validation import PROFILE_INDEX, TIMEOUT, disney_video
+from ..validation import pin as validate_pin
 from ..view_dump import iter_zip_entry_bytes
+from .playback import (
+    async_movie_is_stable,
+    async_open_video,
+    async_refresh_state,
+    async_stop_app,
+)
+
+if TYPE_CHECKING:
+    from ..coordinator import AdbAppStateCoordinator
 
 PACKAGE = "com.disney.disneyplus"
 MAIN_ACTIVITY = "com.bamtechmedia.dominguez.main.MainActivity"
@@ -106,8 +117,8 @@ def detect_ui_state(
 
 def build_video_url(film_id: str) -> str:
     # Accept either a UUID or a full Disney+ URL.
-    value = (film_id or "").strip()
-    if value.startswith("http://") or value.startswith("https://"):
+    value = disney_video(film_id)
+    if value.startswith("https://"):
         return value
     # On this Android TV, the /de-de/play/<id> pattern is reliable, while /video/<id>
     # can trigger an in-app error dialog.
@@ -116,7 +127,7 @@ def build_video_url(film_id: str) -> str:
 
 async def prepare_movie(
     *,
-    coordinator: Any,
+    coordinator: AdbAppStateCoordinator,
     film_id: str,
     profile_index: int | None,
     pin: str | None,
@@ -129,22 +140,25 @@ async def prepare_movie(
     """
 
     url = build_video_url(film_id)
-    component = f"{PACKAGE}/{MAIN_ACTIVITY}"
+    timeout_s = TIMEOUT(timeout_s)
+    if profile_index is not None:
+        profile_index = PROFILE_INDEX(profile_index)
+    if pin is not None:
+        pin = validate_pin(pin)
 
     async def open_video(*, clear_task: bool) -> None:
-        # Some Android TV builds deliver VIEW intents to the already-running top-most
-        # activity without actually navigating. NEW_TASK|CLEAR_TASK forces recreation.
-        flags = "-f 0x10008000" if clear_task else "-f 0x10000000"
-        await coordinator.async_shell(
-            f"am start -W -a android.intent.action.VIEW -d '{url}' -n {component} {flags}",
-            timeout_s=12.0,
+        await async_open_video(
+            coordinator,
+            url=url,
+            package=PACKAGE,
+            activity=MAIN_ACTIVITY,
+            clear_task=clear_task,
         )
 
-    deadline = time.monotonic() + max(15, int(timeout_s))
+    deadline = time.monotonic() + timeout_s
 
     async def refresh_state() -> str:
-        await coordinator.async_request_refresh()
-        return coordinator.data.ui_state if coordinator.data else ""
+        return (await async_refresh_state(coordinator)).ui_state
 
     def has_error_dialog() -> bool:
         data = getattr(coordinator, "data", None)
@@ -162,8 +176,6 @@ async def prepare_movie(
 
     async def type_pin(pin_value: str) -> None:
         for ch in pin_value:
-            if ch < "0" or ch > "9":
-                continue
             await key(f"KEYCODE_{ch}")
 
     started_playback = False
@@ -181,8 +193,10 @@ async def prepare_movie(
         last_deep_link_ts = now
         await open_video(clear_task=clear_task)
 
-    # First try: avoid restarting the app if possible.
-    await maybe_open_deep_link(clear_task=False)
+    await async_stop_app(coordinator, PACKAGE)
+    await open_video(clear_task=True)
+    deep_link_attempts = 1
+    last_deep_link_ts = time.monotonic()
 
     while time.monotonic() < deadline:
         state = await refresh_state()
@@ -198,14 +212,17 @@ async def prepare_movie(
         if state == UI_STATE_CHOOSE_PROFILE:
             # default: just select current profile; optional move right
             if profile_index is not None:
-                for _ in range(max(0, int(profile_index))):
+                for _ in range(profile_index):
                     await key("KEYCODE_DPAD_RIGHT")
             await key("KEYCODE_DPAD_CENTER")
             continue
 
         if state == UI_STATE_ENTER_PIN:
-            if pin:
-                await type_pin(pin)
+            if pin is None:
+                raise RuntimeError(
+                    "Disney+ requires a PIN; provide the pin action field"
+                )
+            await type_pin(pin)
             await key("KEYCODE_DPAD_CENTER")
             # Give the app a moment to transition after PIN.
             await asyncio.sleep(0.6)
@@ -218,10 +235,10 @@ async def prepare_movie(
             continue
 
         if state == UI_STATE_MOVIE:
-            # Guard against transient playback activity during transitions.
-            await asyncio.sleep(0.7)
-            if await refresh_state() != UI_STATE_MOVIE:
+            if not await async_movie_is_stable(coordinator, PACKAGE):
                 continue
+            if time.monotonic() >= deadline:
+                break
             if pause_on_start:
                 await media("pause")
 
@@ -229,10 +246,7 @@ async def prepare_movie(
 
         # If we land on HOME/IN_APP instead of the requested movie, re-issue the deep link.
         if state in (UI_STATE_HOME, UI_STATE_IN_APP) and not started_playback:
-            await maybe_open_deep_link(clear_task=False)
-            # If that doesn't help after a couple tries, force a task restart once.
-            if deep_link_attempts == 2:
-                await maybe_open_deep_link(clear_task=True)
+            await maybe_open_deep_link(clear_task=deep_link_attempts >= 2)
 
         await asyncio.sleep(0.4)
 

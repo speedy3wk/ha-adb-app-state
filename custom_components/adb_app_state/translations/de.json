@@ -12,12 +12,16 @@
       }
     },
     "error": {
+      "invalid_input": "Bitte einen gültigen Wert eingeben. Verwende eine IP-Adresse oder einen Hostnamen und einen Port von 1 bis 65535.",
       "cannot_connect": "Keine Verbindung per ADB möglich.",
       "auth_failed": "ADB-Authentifizierung fehlgeschlagen. Bitte Prompt am TV akzeptieren oder richtigen Key wiederverwenden.",
       "unknown": "Unerwarteter Fehler."
     }
   },
   "options": {
+    "error": {
+      "invalid_input": "Bitte eine positive ganze Zahl für das Intervall und gültige ADB-Key-Optionen eingeben."
+    },
     "step": {
       "init": {
         "title": "Optionen",

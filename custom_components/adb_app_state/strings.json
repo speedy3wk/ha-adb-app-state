@@ -13,12 +13,16 @@
       }
     },
     "error": {
+      "invalid_input": "Enter a valid value. Use an IP address or hostname and a port from 1 to 65535.",
       "cannot_connect": "Cannot connect via ADB.",
       "auth_failed": "ADB authentication failed. Accept the prompt on the TV or reuse the correct key.",
       "unknown": "Unexpected error."
     }
   },
   "options": {
+    "error": {
+      "invalid_input": "Enter a positive whole number of seconds and valid ADB key options."
+    },
     "step": {
       "init": {
         "title": "Options",
