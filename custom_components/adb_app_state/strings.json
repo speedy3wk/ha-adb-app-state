@@ -1,0 +1,33 @@
+{
+  "title": "ADB App State",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Android TV / Shield",
+        "description": "Ensure ADB over network is enabled on your device and accept the authorization prompt on the TV the first time.",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect via ADB.",
+      "auth_failed": "ADB authentication failed. Accept the prompt on the TV or reuse the correct key.",
+      "unknown": "Unexpected error."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "scan_interval": "Polling interval (seconds)",
+          "reuse_androidtv_key": "Reuse Home Assistant AndroidTV key if present",
+          "adbkey_path": "ADB private key path (relative to HA config dir, optional)"
+        }
+      }
+    }
+  }
+}

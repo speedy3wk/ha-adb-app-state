@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible problem with ADB App State.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the actual and expected behavior.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Home Assistant and integration versions
+      placeholder: "Home Assistant 2026.10.4 / ADB App State 0.1.0"
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device, Android version and app version
+      description: Include the affected app (Disney+ or Prime Video).
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove PINs, keys, account details, IP addresses and other personal data. Do not upload unredacted ADB dumps.
+      render: text

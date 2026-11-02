@@ -1,0 +1,134 @@
+prepare_disney_movie:
+  name: Prepare Disney+ movie
+  description: Opens a Disney+ video by film_id, optionally selects profile + enters PIN, optionally pauses on start.
+  fields:
+    entry_id:
+      name: Config entry id
+      description: Required when multiple adb_app_state entries exist.
+      example: 1a2b3c4d5e6f
+      required: false
+      selector:
+        text:
+    film_id:
+      name: Film ID
+      description: Disney+ video UUID (used as https://www.disneyplus.com/de-de/play/<film_id>) OR a full Disney+ URL. Must be playable on this device/account; otherwise Disney may show an error dialog and the service will abort.
+      example: ab7c4e29-04f1-46dd-931a-d43be1ce0f8c
+      required: true
+      selector:
+        text:
+    profile_index:
+      name: Profile index
+      description: 0-based index; moves right N times on the profile picker then selects.
+      example: 0
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 10
+          mode: box
+    pin:
+      name: PIN
+      description: Digits only.
+      example: "1234"
+      required: false
+      selector:
+        text:
+    pause_on_start:
+      name: Pause on start
+      description: Presses play/pause when playback is detected.
+      example: true
+      required: false
+      selector:
+        boolean:
+    timeout:
+      name: Timeout (seconds)
+      description: Overall timeout for the automation.
+      example: 90
+      required: false
+      selector:
+        number:
+          min: 10
+          max: 600
+          mode: box
+
+prepare_prime_movie:
+  name: Prepare Prime Video movie
+  description: Opens a Prime Video title by ASIN or URL, optionally auto-presses DPAD_CENTER, optionally pauses on start.
+  fields:
+    entry_id:
+      name: Config entry id
+      description: Required when multiple adb_app_state entries exist.
+      example: 1a2b3c4d5e6f
+      required: false
+      selector:
+        text:
+    film_asin:
+      name: Amazon ASIN
+      description: Die ID des Films (z.B. B0B5NPCSZX). Es wird https://watch.amazon.de/watch?asin=<ASIN> verwendet.
+      example: B0B5NPCSZX
+      required: true
+      selector:
+        text:
+    auto_login:
+      name: Auto-login (DPAD center)
+      description: Sends a single DPAD_CENTER when the Prime app opens (useful for profile/login prompts).
+      example: true
+      required: false
+      selector:
+        boolean:
+    pause_on_start:
+      name: Pause on start
+      description: Sends pause when MOVIE is detected.
+      example: true
+      required: false
+      selector:
+        boolean:
+    timeout:
+      name: Timeout (seconds)
+      description: Overall timeout for the automation.
+      example: 90
+      required: false
+      selector:
+        number:
+          min: 10
+          max: 600
+          mode: box
+
+media_dispatch:
+  name: Dispatch media key
+  description: Sends a media key via Android's media session (play/pause/stop/next/previous). Useful during DRM playback where UI dumps are redacted.
+  fields:
+    entry_id:
+      name: Config entry id
+      description: Required when multiple adb_app_state entries exist.
+      example: 1a2b3c4d5e6f
+      required: false
+      selector:
+        text:
+    key:
+      name: Media key
+      description: One of play, pause, play-pause, stop, next, previous.
+      example: play-pause
+      required: true
+      selector:
+        text:
+    times:
+      name: Repeat count
+      description: Repeat a supported key N times. Fast-forward and rewind are not supported.
+      example: 6
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 200
+          mode: box
+    delay_ms:
+      name: Delay between repeats (ms)
+      description: Delay in milliseconds between repeated presses.
+      example: 250
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 2000
+          mode: box

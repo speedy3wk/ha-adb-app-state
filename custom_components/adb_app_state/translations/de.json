@@ -1,0 +1,32 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Mit Android TV / Shield verbinden",
+        "description": "Aktiviere ADB über Netzwerk. Beim ersten Mal musst du die Autorisierungs-Abfrage am TV bestätigen.",
+        "data": {
+          "name": "Name",
+          "host": "Host",
+          "port": "Port"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Keine Verbindung per ADB möglich.",
+      "auth_failed": "ADB-Authentifizierung fehlgeschlagen. Bitte Prompt am TV akzeptieren oder richtigen Key wiederverwenden.",
+      "unknown": "Unerwarteter Fehler."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Optionen",
+        "data": {
+          "scan_interval": "Abfrageintervall (Sekunden)",
+          "reuse_androidtv_key": "Home Assistant AndroidTV-Key wiederverwenden (falls vorhanden)",
+          "adbkey_path": "Pfad zum ADB Private Key (relativ zum HA config dir, optional)"
+        }
+      }
+    }
+  }
+}

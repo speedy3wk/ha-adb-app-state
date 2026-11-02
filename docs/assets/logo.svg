@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="200" viewBox="0 0 640 200">
+  <rect width="640" height="200" rx="44" fill="#112b42"/>
+  <rect x="25" y="41" width="150" height="106" rx="14" fill="#38bdf8"/>
+  <rect x="34" y="50" width="132" height="88" rx="6" fill="#112b42"/>
+  <polygon points="56,73 84,94 56,115 51,107 68,94 51,81" fill="#38bdf8"/>
+  <rect x="97" y="107" width="28" height="9" rx="4" fill="#38bdf8"/>
+  <rect x="77" y="155" width="46" height="9" rx="4" fill="#38bdf8"/>
+  <circle cx="150" cy="125" r="17" fill="#112b42"/>
+  <circle cx="150" cy="125" r="11" fill="#4ade80"/>
+  <polygon points="246,127 277,51 291,51 322,127 308,127 284,67 260,127" fill="#38bdf8"/>
+  <rect x="264" y="97" width="40" height="12" fill="#38bdf8"/>
+  <rect x="346" y="51" width="68" height="76" rx="30" fill="#38bdf8"/>
+  <rect x="346" y="51" width="20" height="76" fill="#38bdf8"/>
+  <rect x="359" y="64" width="42" height="50" rx="18" fill="#112b42"/>
+  <rect x="444" y="51" width="66" height="42" rx="20" fill="#38bdf8"/>
+  <rect x="444" y="85" width="70" height="42" rx="20" fill="#38bdf8"/>
+  <rect x="444" y="51" width="16" height="76" fill="#38bdf8"/>
+  <rect x="457" y="63" width="40" height="17" rx="8" fill="#112b42"/>
+  <rect x="457" y="98" width="44" height="17" rx="8" fill="#112b42"/>
+  <rect x="252" y="158" width="194" height="8" rx="4" fill="#38bdf8"/>
+  <circle cx="478" cy="162" r="8" fill="#4ade80"/>
+  <circle cx="510" cy="162" r="8" fill="#38bdf8"/>
+  <circle cx="542" cy="162" r="8" fill="#94a3b8"/>
+</svg>
