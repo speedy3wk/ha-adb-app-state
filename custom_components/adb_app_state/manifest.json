@@ -1,6 +1,7 @@
 {
   "domain": "adb_app_state",
   "name": "ADB App State",
+  "categories": ["media_entertainment.tv_streaming"],
   "codeowners": ["@speedy3wk"],
   "config_flow": true,
   "documentation": "https://github.com/speedy3wk/ha-adb-app-state",
@@ -8,7 +9,7 @@
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/speedy3wk/ha-adb-app-state/issues",
   "requirements": [
-    "adb-shell==0.4.4"
+    "adb-shell>=0.4.4"
   ],
   "version": "0.1.0"
 }
