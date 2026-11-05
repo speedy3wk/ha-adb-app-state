@@ -2,7 +2,7 @@
 
 <img src="custom_components/adb_app_state/brand/logo.png" alt="ADB App State logo" width="320">
 
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://www.hacs.xyz/docs/faq/custom_repositories/)
+[![Marketplace custom repository](https://img.shields.io/badge/Marketplace-Custom-orange.svg)](https://www.home-assistant.io/integrations/marketplace/#custom-repositories)
 [![Release](https://img.shields.io/github/v/release/speedy3wk/ha-adb-app-state.svg)](https://github.com/speedy3wk/ha-adb-app-state/releases)
 [![Validate](https://github.com/speedy3wk/ha-adb-app-state/actions/workflows/validate.yml/badge.svg)](https://github.com/speedy3wk/ha-adb-app-state/actions/workflows/validate.yml)
 [![Tests](https://github.com/speedy3wk/ha-adb-app-state/actions/workflows/tests.yml/badge.svg)](https://github.com/speedy3wk/ha-adb-app-state/actions/workflows/tests.yml)
@@ -32,7 +32,20 @@ Detection is based on Android TV/Shield-style output, not a universal Android or
 
 ## Installation
 
-### HACS
+### Marketplace (recommended, Home Assistant 2026.11+)
+
+Since Home Assistant 2026.11, HACS is built in as the [Marketplace](https://www.home-assistant.io/integrations/marketplace/). No separate HACS installation is needed. This integration is a **custom repository**, not a catalog listing.
+
+1. Open **Settings > Marketplace** as an administrator and accept the community-content warning if prompted.
+2. Select **Add from link**, enter `https://github.com/speedy3wk/ha-adb-app-state` and select **Add**. Connect GitHub if prompted. If asked for a content type, select **Integration**.
+3. Open **ADB App State** and select **Install**.
+4. Follow the integration setup flow. If it does not open, go to **Settings > Devices & services > Add integration** and search for **ADB App State**. Restart only if the Marketplace requests it.
+
+Existing HACS installations migrate automatically when updating to Home Assistant 2026.11; installed integrations and their update entities are kept. Integration updates still require a Home Assistant restart.
+
+### HACS (Home Assistant versions before 2026.11)
+
+For older supported Home Assistant versions, use the following legacy HACS instructions.
 
 This is a **custom repository**, not currently part of the HACS default list.
 
@@ -165,11 +178,11 @@ python -m pytest -q
 
 Tests use synthetic ADB output and mocked connections. Passing tests do not certify playback or compatibility with physical devices. Do not point automated tests at your Home Assistant installation.
 
-### HACS listing readiness
+### Marketplace metadata and catalog status
 
-The repository includes a root README, MIT license, HACS metadata, release version, maintainer/issue links, validation workflows and local PNG brand assets. Artwork sources are in [`docs/assets`](./docs/assets); Home Assistant loads images from [`brand`](./custom_components/adb_app_state/brand).
+The repository includes a root README, MIT license, `hacs.json` metadata (also used by the Marketplace), release version, maintainer/issue links, validation workflows and local PNG brand assets. Artwork sources are in [`docs/assets`](./docs/assets); Home Assistant loads images from [`brand`](./custom_components/adb_app_state/brand).
 
-A future default-list submission is a separate step, subject to the [current HACS inclusion requirements](https://www.hacs.xyz/docs/publish/include/) and maintainer review. No HACS listing or acceptance is implied by this release.
+Installation uses the Marketplace's [custom repository support](https://www.home-assistant.io/integrations/marketplace/#custom-repositories). Catalog inclusion is a separate step; no catalog listing or acceptance is implied by this release.
 
 ## License
 
